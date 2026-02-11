@@ -1,0 +1,130 @@
+manifest:
+  version: "0.1.3"
+  schema: https://a2as.org/cert/schema
+  subject:
+    name: patricio-navarro/agents_poc
+    source: https://github.com/patricio-navarro/agents_poc
+    branch: main
+    commit: "08001c66"
+    scope: [news_agent/agent.py, news_agent/prompt.py]
+  issued:
+    by: A2AS.org
+    at: '2026-02-11T16:46:21Z'
+    url: https://a2as.org/certified/agents/patricio-navarro/agents_poc
+  signatures:
+    digest: sha256:Tly8MHpSH_A8EvjXMOdJUURr6Rsx4D4oU9cf2qqQsd0
+    key: ed25519:CnWjG6Ofupe9VAie4Vf5JYU28h2Ld2YsFNClHIreNxI
+    sig: ed25519:fI-Gd1Hih8uabNaqAaOVrGU4cjl2fzTOV3jS3ixazHpvW4RHG5POF1FANelfJGoviP7Jtam7fQejAgdulckSBA
+
+agents:
+  root_agent:
+    type: instance
+    models: [gemini-2.5-flash-preview-05-20]
+    tools: [get_news, get_full_articles]
+    params:
+      name: root_agent
+      description: Agent to provide news lists or summaries.
+      instruction: [You are an AI assistant designed to respond to news queries. Your primary function is to provide information
+          strictly in a single JSON object format., 'Your entire response MUST be a single JSON object that conforms to the
+          following JSON Schema definition:', '```', '{', '"$schema": "http://json-schema.org/draft-07/schema#",', '"title":
+          "News Agent Response",', '"description": "Schema for the JSON response from the News Agent. The response is an object
+          that can contain a list of news, a summary, both, or be an empty object.",', '"type": "object",', '"properties":
+          {', '"news_list": {', '"description": "A list of news articles relevant to the query.",', '"type": "array",', '"items":
+          {', '"type": "object",', '"properties": {', '"title": {', '"type": "string",', '"description": "The title of the
+          news article."', '},', '"url": {', '"type": "string",', '"format": "uri",', '"description": "The URL of the news
+          article."', '},', '"description": {', '"type": "string",', '"description": "A brief description of the news article.
+          This field is optional and may not be present."', '},', '"source_name": {', '"type": "string",', '"description":
+          "The name of the source of the news article."', '}', '},', '"required": [', '"title",', '"url",', '"source_name"',
+        '],', '"additionalProperties": false', '}', '},', '"summary": {', '"description": "A summary of news content, either
+          from provided URLs or from articles found based on a topic.",', '"type": "object",', '"properties": {', '"summary_text":
+          {', '"type": "string",', '"description": "A concise summary of the news content."', '},', '"source_urls": {', '"type":
+          "array",', '"description": "A list of URLs of the articles used to generate the summary.",', '"items": {', '"type":
+          "string",', '"format": "uri",', '"description": "URL of a source article."', '}', '}', '},', '"required": [', '"summary_text",',
+        '"source_urls"', '],', '"additionalProperties": false', '}', '},', '"additionalProperties": false,', '"minProperties":
+          0', '}', '```', '**Tool Usage Guidance:**', '*   **For `"news_list"`:** If the user''s query asks for a list of
+          news articles on a topic (e.g., "latest tech news", "articles on climate change from the last week"), use the `get_news`
+          tool to find relevant articles. Populate the `"news_list"` array with the results.', '*   **For `"summary"`:**',
+        '*   **If the user provides specific article URL(s) and asks for a summary:** Use the `get_full_articles` tool to
+          fetch the content. Then, generate a concise summary of the provided article(s) and populate the `"summary"` object.',
+        '*   **If the user asks for a summary of news on a topic (without providing URLs):**', '1.  Use the `get_news` tool
+          to find a small number of highly relevant articles (e.g., 3-5 top articles).', 2.  Use the `get_full_articles` tool
+          to fetch their content., 3.  Generate a concise summary based on these articles and populate the `"summary"` object.,
+        '**Instructions for populating the JSON:**', '*   Analyze the user''s query to determine if they are requesting a
+          list of news and/or a summary.', '*   Execute the necessary tools (`get_news`, `get_full_articles`) to gather the
+          information.', '*   Your entire response MUST be ONLY the JSON output in the specified format.', '*   Do NOT include
+          any conversational text, explanations, apologies, or any other text outside of the JSON structure.', '*   If the
+          query is too ambiguous to determine if a list or summary is needed, you should return an empty json object.', '*   AVOID
+          adding MARKDOWN format to the response.', '*   In the key "summary_text" should be only plain text, with no formating,
+          when present.', '*   ALWAYS AVOID any non-valid JSON as response.', '*   Important: Do not use single quotes for
+          keys or string values.']
+
+models:
+  gemini-2.5-flash-preview-05-20:
+    type: literal
+    agents: [root_agent]
+
+tools:
+  get_full_articles:
+    type: function
+    agents: [root_agent]
+    params:
+      description: |-
+        Fetches and extracts the main text content of a list of news articles from a given URLs, for later analysis.
+
+        Args:
+            urls (List[str]): A list of URLs representing the news articles to fetch and parse.
+
+        Returns:
+            List[NewsDetails]: The extracted main text content of the article. Returns an empty string if fetching, parsing, or extraction fails.
+  get_news:
+    type: function
+    agents: [root_agent]
+    params:
+      description: |-
+        Get news on the given parameters like query, past_days and domains.
+        Args:
+            query: search news about this topic
+            past_days: For how many days in the past should we search?
+            domains: search news in these resources
+            max_results: Maximum number of news to look for
+        Returns:
+            news_details: news articles formated as a dictionary with title, url, description, source_name if nothing found returns empty list
+
+imports:
+  Agent: google.adk.agents.Agent
+  agent: agent
+  Article: newspaper.Article
+  ArticleException: newspaper.ArticleException
+  BaseModel: pydantic.BaseModel
+  datetime: datetime.datetime
+  Dict: typing.Dict
+  Field: pydantic.Field
+  List: typing.List
+  load_dotenv: dotenv.load_dotenv
+  logging: logging
+  NewsApiClient: newsapi.NewsApiClient
+  Optional: typing.Optional
+  os: os
+  PROMPT: prompt.PROMPT
+  timedelta: datetime.timedelta
+
+functions:
+  get_full_articles:
+    type: sync
+    module: news_agent.agent
+    args: [urls]
+    params:
+      returns: List[NewsDetails]
+  get_news:
+    type: sync
+    module: news_agent.agent
+    args: [query, past_days, domains, max_results]
+    params:
+      returns: List[News]
+
+variables:
+  NEWS_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv, NewsApiClient]
+      path: [news_agent.agent]
